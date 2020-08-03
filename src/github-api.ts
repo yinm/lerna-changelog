@@ -1,5 +1,6 @@
 const path = require("path");
 
+import { Configuration } from "./configuration";
 import ConfigurationError from "./configuration-error";
 import fetch from "./fetch";
 
@@ -24,34 +25,36 @@ export interface GitHubIssueResponse {
   };
 }
 
-export interface Options {
-  repo: string;
-  rootPath: string;
-  cacheDir?: string;
-}
-
 export default class GithubAPI {
   private cacheDir: string | undefined;
   private auth: string;
+  private host: string;
+  private apiHost: string;
 
-  constructor(config: Options) {
-    this.cacheDir = config.cacheDir && path.join(config.rootPath, config.cacheDir, "github");
-    this.auth = this.getAuthToken();
+  constructor(config: Configuration) {
+    const { githubEnterpriseUrl } = config;
+    const githubHost = githubEnterpriseUrl ? "github-enterprise" : "github";
+    this.cacheDir = config.cacheDir && path.join(config.rootPath, config.cacheDir, githubHost);
+    this.auth = this.getAuthToken(githubEnterpriseUrl);
     if (!this.auth) {
-      throw new ConfigurationError("Must provide GITHUB_AUTH");
+      throw new ConfigurationError(
+        "Must provide GITHUB_AUTH (if you use GitHub Enterprise, must provide GITHUB_ENTERPRISE_AUTH to env and githubEnterpriseUrl to config)"
+      );
     }
+    this.host = this.githubHost(githubEnterpriseUrl);
+    this.apiHost = this.githubAPIHost(githubEnterpriseUrl);
   }
 
   public getBaseIssueUrl(repo: string): string {
-    return `https://github.com/${repo}/issues/`;
+    return `${this.host}${repo}/issues/`;
   }
 
   public async getIssueData(repo: string, issue: string): Promise<GitHubIssueResponse> {
-    return this._fetch(`https://api.github.com/repos/${repo}/issues/${issue}`);
+    return this._fetch(`${this.apiHost}repos/${repo}/issues/${issue}`);
   }
 
   public async getUserData(login: string): Promise<GitHubUserResponse> {
-    return this._fetch(`https://api.github.com/users/${login}`);
+    return this._fetch(`${this.apiHost}users/${login}`);
   }
 
   private async _fetch(url: string): Promise<any> {
@@ -68,7 +71,19 @@ export default class GithubAPI {
     throw new ConfigurationError(`Fetch error: ${res.statusText}.\n${JSON.stringify(parsedResponse)}`);
   }
 
-  private getAuthToken(): string {
+  private getAuthToken(githubEnterpriseUrl: string): string {
+    if (githubEnterpriseUrl) {
+      return process.env.GITHUB_ENTERPRISE_AUTH || "";
+    }
+
     return process.env.GITHUB_AUTH || "";
+  }
+
+  private githubHost(githubEnterpriseUrl: string): string {
+    return githubEnterpriseUrl ? githubEnterpriseUrl : "https://github.com/";
+  }
+
+  private githubAPIHost(githubEnterpriseUrl: string): string {
+    return githubEnterpriseUrl ? `${githubEnterpriseUrl}api/v3/` : "https://api.github.com/";
   }
 }

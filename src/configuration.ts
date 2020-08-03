@@ -6,6 +6,7 @@ const hostedGitInfo = require("hosted-git-info");
 import ConfigurationError from "./configuration-error";
 
 export interface Configuration {
+  githubEnterpriseUrl: string;
   repo: string;
   rootPath: string;
   labels: { [key: string]: string };
@@ -31,7 +32,11 @@ export function fromPath(rootPath: string, options: ConfigLoaderOptions = {}): C
   let config = fromPackageConfig(rootPath) || fromLernaConfig(rootPath) || {};
 
   // Step 2: fill partial config with defaults
-  let { repo, nextVersion, labels, cacheDir, ignoreCommitters } = config;
+  let { githubEnterpriseUrl, repo, nextVersion, labels, cacheDir, ignoreCommitters } = config;
+
+  if (!githubEnterpriseUrl) {
+    githubEnterpriseUrl = "";
+  }
 
   if (!repo) {
     repo = findRepo(rootPath);
@@ -70,6 +75,7 @@ export function fromPath(rootPath: string, options: ConfigLoaderOptions = {}): C
   }
 
   return {
+    githubEnterpriseUrl,
     repo,
     nextVersion,
     rootPath,
